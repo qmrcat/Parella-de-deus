@@ -1,0 +1,988 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Parelles de Deu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EDF1F7;
+    --board: #FBFCFE;
+    --line: #DCE3EE;
+    --line-strong: #B8C5D7;
+    --ink: #15213A;
+    --ink-soft: #5A6982;
+    --faded: #C6CFDC;
+    --mark: #FFE14D;
+    --mark-ink: #15213A;
+    --hint: #12977F;
+    --bad: #D4453C;
+    --accent: #2450D6;
+    --accent-ink: #FFFFFF;
+    --btn: #FFFFFF;
+    --btn-line: #CAD4E2;
+    --scrim: rgba(21, 33, 58, .45);
+    --shadow: 0 1px 0 rgba(21, 33, 58, .05), 0 14px 30px -18px rgba(21, 33, 58, .35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #0D1420;
+      --board: #121B2B;
+      --line: #1F2C42;
+      --line-strong: #2C3D59;
+      --ink: #E6ECF6;
+      --ink-soft: #93A2B9;
+      --faded: #33435C;
+      --mark: #F4D43A;
+      --mark-ink: #14203A;
+      --hint: #3CC9AE;
+      --bad: #F1675D;
+      --accent: #6F8DFF;
+      --accent-ink: #0D1420;
+      --btn: #172238;
+      --btn-line: #2A3A55;
+      --scrim: rgba(3, 7, 14, .65);
+      --shadow: 0 1px 0 rgba(0, 0, 0, .3), 0 14px 30px -18px rgba(0, 0, 0, .8);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #0D1420;
+    --board: #121B2B;
+    --line: #1F2C42;
+    --line-strong: #2C3D59;
+    --ink: #E6ECF6;
+    --ink-soft: #93A2B9;
+    --faded: #33435C;
+    --mark: #F4D43A;
+    --mark-ink: #14203A;
+    --hint: #3CC9AE;
+    --bad: #F1675D;
+    --accent: #6F8DFF;
+    --accent-ink: #0D1420;
+    --btn: #172238;
+    --btn-line: #2A3A55;
+    --scrim: rgba(3, 7, 14, .65);
+    --shadow: 0 1px 0 rgba(0, 0, 0, .3), 0 14px 30px -18px rgba(0, 0, 0, .8);
+  }
+
+  [hidden] { display: none !important; }
+  html, body { min-height: 100%; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    padding-inline: 16px;
+    padding-block: 20px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* Capçalera */
+  .top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 {
+    margin: 0;
+    font-family: "Bricolage Grotesque", "Figtree", system-ui, sans-serif;
+    font-weight: 800;
+    font-size: 30px;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
+  h1 .ten {
+    background: var(--mark);
+    color: var(--mark-ink);
+    padding: 0 .14em;
+    border-radius: 6px 10px 7px 11px;
+  }
+  .tagline { margin: 6px 0 0; color: var(--ink-soft); font-size: 14px; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat .lbl {
+    font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .stat .val {
+    font-family: "Bricolage Grotesque", "Figtree", system-ui, sans-serif;
+    font-weight: 700; font-size: 24px; line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat.best .val { color: var(--ink-soft); }
+
+  .say {
+    min-height: 20px; font-size: 14px; color: var(--ink-soft);
+    transition: color .2s;
+  }
+  .say.warn { color: var(--bad); }
+  .say.good { color: var(--hint); }
+
+  /* Tauler */
+  .board-wrap {
+    position: relative;
+    background: var(--board);
+    border: 1px solid var(--line-strong);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    border-bottom: 1px solid var(--line);
+  }
+  .row:last-child { border-bottom: 0; }
+  .row.collapse {
+    overflow: hidden;
+    height: 0 !important;
+    opacity: 0;
+    border-bottom-width: 0;
+    transition: height .26s ease, opacity .2s ease;
+  }
+  .cell {
+    aspect-ratio: 1;
+    min-width: 0;
+    border: 0;
+    border-right: 1px solid var(--line);
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    color: var(--ink);
+    font-family: "Bricolage Grotesque", "Figtree", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: clamp(19px, 6vw, 27px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    display: grid;
+    place-items: center;
+    position: relative;
+    cursor: pointer;
+    outline: none;
+  }
+  .cell:nth-child(9n) { border-right: 0; }
+  .cell::before {
+    content: "";
+    position: absolute;
+    inset: 13%;
+    border-radius: 44% 56% 52% 48% / 52% 44% 56% 48%;
+    background: transparent;
+    transition: background .15s, transform .15s;
+  }
+  .cell > span { position: relative; }
+  .cell.ghost { cursor: default; }
+  .cell.done { color: var(--faded); cursor: default; }
+  .cell.sel::before { background: var(--mark); transform: rotate(-4deg) scale(1.06); }
+  .cell.sel { color: var(--mark-ink); }
+  .cell.hint::before { box-shadow: inset 0 0 0 2.5px var(--hint); animation: pulse 1s ease-in-out infinite; }
+  .cell.bad { animation: shake .32s; }
+  .cell.bad > span { color: var(--bad); }
+  .cell.pop > span { animation: pop .38s ease-out; }
+  .cell.fresh > span { animation: rise .42s ease-out both; }
+  .cell:focus-visible::after {
+    content: ""; position: absolute; inset: 3px; border-radius: 8px;
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  @media (hover: hover) {
+    .cell:not(.done):not(.ghost):not(.sel):hover::before {
+      background: color-mix(in srgb, var(--mark) 38%, transparent);
+    }
+  }
+
+  .float {
+    position: absolute;
+    pointer-events: none;
+    font-family: "Bricolage Grotesque", "Figtree", system-ui, sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    color: var(--hint);
+    transform: translate(-50%, -50%);
+    animation: floatUp .8s ease-out forwards;
+    z-index: 2;
+  }
+
+  /* Accions */
+  .actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    padding-block: 18px calc(14px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(to bottom, transparent, var(--paper) 34%);
+  }
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    min-height: 52px; padding-inline: 8px;
+    border-radius: 12px;
+    border: 1px solid var(--btn-line);
+    background: var(--btn);
+    color: var(--ink);
+    font: 600 15px/1.1 "Figtree", system-ui, sans-serif;
+    cursor: pointer;
+    transition: transform .1s, opacity .15s;
+  }
+  .btn:active:not(:disabled) { transform: translateY(1px) scale(.98); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .btn svg { width: 18px; height: 18px; flex: none; }
+  .btn.nudge { animation: nudge .55s ease-in-out 3; }
+  .badge {
+    min-width: 22px; height: 22px; padding-inline: 6px;
+    display: grid; place-items: center;
+    border-radius: 11px;
+    background: var(--mark); color: var(--mark-ink);
+    font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+  }
+  .btn.primary .badge { background: var(--accent-ink); color: var(--accent); }
+
+  /* Demo */
+  .btn.small { min-height: 40px; padding-inline: 14px; font-size: 14px; border-radius: 999px; }
+  .btn.small svg { width: 15px; height: 15px; }
+  .demo-bar {
+    background: var(--board);
+    border: 2px solid var(--mark);
+    border-radius: 12px;
+    padding: 10px 14px 12px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .demo-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .demo-step {
+    font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .link-btn {
+    border: 0; background: transparent; padding: 4px 0; cursor: pointer;
+    color: var(--accent); font: 600 14px/1 "Figtree", system-ui, sans-serif;
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+  .link-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  .link-btn.go {
+    text-decoration: none; background: var(--accent); color: var(--accent-ink);
+    padding: 8px 16px; border-radius: 999px;
+  }
+  .demo-text { margin: 0; font-size: 16px; font-weight: 500; line-height: 1.4; min-height: 2.8em; color: var(--ink); }
+  body.demo .say { display: none; }
+  body.demo #hintBtn, body.demo #newBtn, body.demo #demoBtn { opacity: .45; pointer-events: none; }
+  body.demo .cell { cursor: default; }
+  .finger {
+    position: absolute; left: 0; top: 0;
+    width: 40px; height: 40px; margin: -20px 0 0 -20px;
+    border-radius: 50%;
+    border: 3px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    pointer-events: none; z-index: 3;
+    transition: left .45s cubic-bezier(.3, .7, .3, 1), top .45s cubic-bezier(.3, .7, .3, 1);
+  }
+  .finger.tap { animation: tapRing .35s ease-out; }
+  @keyframes tapRing { 50% { transform: scale(.7); } }
+
+  /* Regles */
+  details.rules {
+    border-top: 1px solid var(--line-strong);
+    padding-block: 12px 4px;
+    color: var(--ink);
+  }
+  details.rules summary {
+    cursor: pointer; font-weight: 600; font-size: 15px; list-style: none;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  details.rules summary::-webkit-details-marker { display: none; }
+  details.rules summary::after { content: "+"; font-size: 20px; color: var(--ink-soft); }
+  details.rules[open] summary::after { content: "−"; }
+  details.rules summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  .rules ul { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; line-height: 1.5; max-width: 65ch; color: var(--ink-soft); }
+  .rules b { color: var(--ink); font-weight: 600; }
+  .pairs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .pair {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--btn-line); background: var(--btn);
+    font-family: "Bricolage Grotesque", "Figtree", system-ui, sans-serif;
+    font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums;
+  }
+  .pair i { font-style: normal; color: var(--ink-soft); font-weight: 600; font-size: 13px; }
+
+  /* Finestra de final */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    padding-inline: 16px;
+    background: var(--scrim);
+    animation: fade .2s ease-out;
+  }
+  .dialog {
+    width: 100%; max-width: 360px;
+    background: var(--board);
+    color: var(--ink);
+    border: 1px solid var(--line-strong);
+    border-radius: 18px;
+    padding: 24px 20px 20px;
+    box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: 14px;
+    text-align: left;
+  }
+  .dialog h2 {
+    margin: 0;
+    font-family: "Bricolage Grotesque", "Figtree", system-ui, sans-serif;
+    font-weight: 800; font-size: 26px; letter-spacing: -0.02em; line-height: 1.1;
+    text-wrap: balance;
+  }
+  .dialog p { margin: 0; color: var(--ink-soft); line-height: 1.5; }
+  .dialog .stats { padding-block: 4px; }
+
+  @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+  @keyframes pop { 0% { transform: scale(1.35); color: var(--hint); } 100% { transform: scale(1); } }
+  @keyframes rise { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes floatUp { from { opacity: 1; margin-top: 0; } to { opacity: 0; margin-top: -34px; } }
+  @keyframes nudge { 0%, 100% { transform: none; } 50% { transform: translateY(-4px); } }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+  }
+  @media (max-width: 380px) {
+    .btn { font-size: 14px; gap: 5px; }
+    .btn svg { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<main class="app">
+  <header class="top">
+    <div>
+      <h1>Parelles de <span class="ten">Deu</span></h1>
+      <p class="tagline">Uneix números iguals o que sumin 10.</p>
+    </div>
+    <button class="btn small" id="demoBtn" type="button">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
+      Demo
+    </button>
+  </header>
+
+  <section class="stats" aria-label="Marcador">
+    <div class="stat"><span class="lbl">Fase</span><span class="val" id="stage">1</span></div>
+    <div class="stat"><span class="lbl">Punts</span><span class="val" id="score">0</span></div>
+    <div class="stat best"><span class="lbl">Rècord</span><span class="val" id="best">0</span></div>
+  </section>
+
+  <div class="say" id="say" aria-live="polite">Toca un número i després la seva parella.</div>
+
+  <div class="demo-bar" id="demoBar" hidden>
+    <div class="demo-head">
+      <span class="demo-step" id="demoStep">Demo · pas 1</span>
+      <button class="link-btn" id="demoExit" type="button">Surt de la demo</button>
+    </div>
+    <p class="demo-text" id="demoText" aria-live="polite"></p>
+  </div>
+
+  <div class="board-wrap" id="wrap">
+    <div id="board" role="grid" aria-label="Tauler de números"></div>
+    <div class="finger" id="finger" hidden></div>
+  </div>
+
+  <nav class="actions" aria-label="Accions">
+    <button class="btn primary" id="addBtn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      Afegeix <span class="badge" id="addCount">5</span>
+    </button>
+    <button class="btn" id="hintBtn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>
+      Pista <span class="badge" id="hintCount">3</span>
+    </button>
+    <button class="btn" id="newBtn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+      <span id="newLbl">Nova</span>
+    </button>
+  </nav>
+
+  <details class="rules" id="rules">
+    <summary>Com es juga</summary>
+    <ul>
+      <li>Tria dos números <b>iguals</b> (7 i 7) o que <b>sumin 10</b> (3 i 7).</li>
+      <li>Han d'estar <b>connectats</b>: al costat en horitzontal, vertical o diagonal, o bé el final d'una fila amb l'inici de la següent. Les caselles ja ratllades no compten com a obstacle.</li>
+      <li>Quan una fila queda buida, desapareix i les de sota pugen.</li>
+      <li>Si no trobes cap parella, <b>Afegeix</b> copia tots els números que queden al final del tauler. Tens 5 usos per fase.</li>
+      <li>Buida tot el tauler per passar de fase. Si no queden parelles ni usos d'Afegeix, la partida s'acaba.</li>
+      <li><b>Punts:</b> 1 per parella veïna, 4 per parella separada per caselles ratllades, 10 per fila buidada i 150 per tauler net.</li>
+    </ul>
+    <div class="pairs" aria-label="Parelles que sumen deu">
+      <span class="pair">1<i>+</i>9</span>
+      <span class="pair">2<i>+</i>8</span>
+      <span class="pair">3<i>+</i>7</span>
+      <span class="pair">4<i>+</i>6</span>
+      <span class="pair">5<i>+</i>5</span>
+    </div>
+  </details>
+</main>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="ovTitle">
+    <h2 id="ovTitle"></h2>
+    <p id="ovText"></p>
+    <div class="stats">
+      <div class="stat"><span class="lbl">Fase</span><span class="val" id="ovStage">1</span></div>
+      <div class="stat"><span class="lbl">Punts</span><span class="val" id="ovScore">0</span></div>
+      <div class="stat best"><span class="lbl">Rècord</span><span class="val" id="ovBest">0</span></div>
+    </div>
+    <button class="btn primary" id="ovBtn" type="button"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const COLS = 9;
+  const ADDS = 5;
+  const HINTS = 3;
+  const KEY = "parelles-de-deu-v1";
+  // Direccions cap endavant: seguit (inclou salt de fila), vertical, diagonal dreta, diagonal esquerra
+  const DIRS = [
+    { step: 1, dc: null },
+    { step: 9, dc: 0 },
+    { step: 10, dc: 1 },
+    { step: 8, dc: -1 }
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  const boardEl = $("board"), wrapEl = $("wrap"), sayEl = $("say");
+  const addBtn = $("addBtn"), hintBtn = $("hintBtn"), newBtn = $("newBtn");
+
+  let S = null;          // estat de la partida
+  let sel = null;        // índex seleccionat
+  let busy = false;      // bloqueig durant animacions
+  let fx = { pop: new Set(), bad: new Set(), hint: new Set(), fresh: new Set() };
+  let confirmTimer = null;
+
+  // ---------- Lògica ----------
+  const fits = (a, b) => a === b || a + b === 10;
+
+  function firstOpen(cells, i, d) {
+    const c0 = i % COLS;
+    for (let m = 1; ; m++) {
+      if (d.dc !== null && d.dc !== 0) {
+        const c = c0 + d.dc * m;
+        if (c < 0 || c >= COLS) return null;
+      }
+      const k = i + d.step * m;
+      if (k >= cells.length) return null;
+      if (!cells[k].c) return { k, m };
+    }
+  }
+
+  function link(cells, a, b) {
+    const i = Math.min(a, b), j = Math.max(a, b);
+    for (const d of DIRS) {
+      const r = firstOpen(cells, i, d);
+      if (r && r.k === j) return r;
+    }
+    return null;
+  }
+
+  function allMoves(cells) {
+    const out = [];
+    cells.forEach((cell, i) => {
+      if (cell.c) return;
+      for (const d of DIRS) {
+        const r = firstOpen(cells, i, d);
+        if (r && fits(cell.v, cells[r.k].v)) out.push([i, r.k, r.m]);
+      }
+    });
+    return out;
+  }
+
+  function makeBoard(count) {
+    let cells;
+    for (let tries = 0; tries < 400; tries++) {
+      cells = Array.from({ length: count }, () => ({ v: 1 + Math.floor(Math.random() * 9), c: false }));
+      const n = allMoves(cells).length;
+      if (n >= 3 && n <= 10) break;
+    }
+    return cells;
+  }
+
+  function stageSize(stage) {
+    return Math.min(27 + 9 * (stage - 1), 45);
+  }
+
+  function freshState(stage, score, best) {
+    return {
+      cells: makeBoard(stageSize(stage)),
+      stage, score, best,
+      adds: ADDS, hints: HINTS,
+      over: false, won: false
+    };
+  }
+
+  function fullRows() {
+    const rows = [];
+    const n = Math.ceil(S.cells.length / COLS);
+    for (let r = 0; r < n; r++) {
+      const slice = S.cells.slice(r * COLS, r * COLS + COLS);
+      if (slice.length && slice.every((c) => c.c)) rows.push(r);
+    }
+    return rows;
+  }
+
+  function addPoints(p) {
+    S.score += p;
+    if (S.score > S.best) S.best = S.score;
+  }
+
+  // ---------- Accions ----------
+  function tap(i) {
+    if (busy || S.over || S.won) return;
+    const cell = S.cells[i];
+    if (!cell || cell.c) return;
+    fx.hint.clear();
+
+    if (sel === null) { sel = i; render(); return; }
+    if (sel === i) { sel = null; render(); return; }
+
+    const a = S.cells[sel];
+    const r = link(S.cells, sel, i);
+    if (r && fits(a.v, cell.v)) {
+      a.c = true; cell.c = true;
+      const pts = r.m > 1 ? 4 : 1;
+      addPoints(pts);
+      fx.pop = new Set([sel, i]);
+      const pair = [sel, i];
+      sel = null;
+      say(pts > 1 ? "Parella a distància. +4" : "Parella! +1", "good");
+      render();
+      floatAt(pair[1], "+" + pts);
+      fx.pop.clear();
+      save();
+      afterMatch();
+    } else {
+      if (!fits(a.v, cell.v)) say(`${a.v} i ${cell.v} no són iguals ni sumen 10.`, "warn");
+      else say("Aquests dos no estan connectats: hi ha números pel mig.", "warn");
+      fx.bad = new Set([sel, i]);
+      sel = i;
+      render();
+      fx.bad.clear();
+    }
+  }
+
+  function afterMatch() {
+    const rows = fullRows();
+    if (!rows.length) { check(); return; }
+    busy = true;
+    const st = S;
+    setTimeout(() => {
+      if (S !== st) { busy = false; return; }
+      const els = boardEl.children;
+      rows.forEach((r) => {
+        const el = els[r];
+        if (!el) return;
+        el.style.height = el.offsetHeight + "px";
+        void el.offsetHeight;
+        el.classList.add("collapse");
+      });
+      setTimeout(() => {
+        if (S !== st) { busy = false; return; }
+        for (let k = rows.length - 1; k >= 0; k--) S.cells.splice(rows[k] * COLS, COLS);
+        const bonus = 10 * rows.length;
+        addPoints(bonus);
+        say(rows.length > 1 ? `${rows.length} files buidades. +${bonus}` : "Fila buidada. +10", "good");
+        busy = false;
+        render();
+        save();
+        check();
+      }, 280);
+    }, 260);
+  }
+
+  function check() {
+    if (S.cells.every((c) => c.c)) {
+      addPoints(150);
+      S.won = true;
+      save();
+      render();
+      showOverlay();
+      return;
+    }
+    if (allMoves(S.cells).length === 0) {
+      if (S.adds > 0) {
+        say("No queden parelles. Toca Afegeix per continuar.", "warn");
+        nudge(addBtn);
+      } else {
+        S.over = true;
+        save();
+        render();
+        showOverlay();
+      }
+    }
+  }
+
+  function addNumbers() {
+    if (busy || S.over || S.won) return;
+    if (S.adds <= 0) { say("Ja has fet servir tots els Afegeix d'aquesta fase.", "warn"); return; }
+    const vals = S.cells.filter((c) => !c.c).map((c) => c.v);
+    const start = S.cells.length;
+    vals.forEach((v) => S.cells.push({ v, c: false }));
+    fx.fresh = new Set(vals.map((_, k) => start + k));
+    S.adds--;
+    sel = null;
+    fx.hint.clear();
+    say(`S'han afegit ${vals.length} números al final.`);
+    render();
+    fx.fresh.clear();
+    const target = boardEl.children[Math.floor(start / COLS)];
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    save();
+    if (allMoves(S.cells).length === 0) check();
+  }
+
+  function hint() {
+    if (busy || S.over || S.won) return;
+    if (S.hints <= 0) { say("No et queden pistes en aquesta fase.", "warn"); return; }
+    const ms = allMoves(S.cells);
+    if (!ms.length) {
+      say("No hi ha cap parella. Toca Afegeix.", "warn");
+      nudge(addBtn);
+      return;
+    }
+    const [a, b] = ms[Math.floor(Math.random() * ms.length)];
+    S.hints--;
+    sel = null;
+    fx.hint = new Set([a, b]);
+    say("Mira les dues caselles marcades.");
+    render();
+    const el = boardEl.querySelector(`[data-i="${a}"]`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    save();
+  }
+
+  function newGame() {
+    const best = S ? S.best : 0;
+    S = freshState(1, 0, best);
+    sel = null;
+    fx.hint.clear();
+    hideOverlay();
+    say("Partida nova. Toca un número i després la seva parella.");
+    render();
+    save();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function nextStage() {
+    S = freshState(S.stage + 1, S.score, S.best);
+    sel = null;
+    fx.hint.clear();
+    hideOverlay();
+    say(`Fase ${S.stage}. Tens ${ADDS} Afegeix i ${HINTS} pistes.`);
+    render();
+    save();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // ---------- Interfície ----------
+  function say(text, tone) {
+    sayEl.textContent = text;
+    sayEl.className = "say" + (tone ? " " + tone : "");
+  }
+
+  function nudge(btn) {
+    btn.classList.remove("nudge");
+    void btn.offsetWidth;
+    btn.classList.add("nudge");
+  }
+
+  function floatAt(i, text) {
+    const el = boardEl.querySelector(`[data-i="${i}"]`);
+    if (!el) return;
+    const wr = wrapEl.getBoundingClientRect(), cr = el.getBoundingClientRect();
+    const f = document.createElement("span");
+    f.className = "float";
+    f.textContent = text;
+    f.style.left = (cr.left - wr.left + cr.width / 2) + "px";
+    f.style.top = (cr.top - wr.top + cr.height / 2) + "px";
+    wrapEl.appendChild(f);
+    setTimeout(() => f.remove(), 850);
+  }
+
+  function render() {
+    const n = S.cells.length;
+    const rows = Math.max(Math.ceil(n / COLS), 1);
+    const totalRows = Math.max(rows, 5);
+    const frag = document.createDocumentFragment();
+    for (let r = 0; r < totalRows; r++) {
+      const row = document.createElement("div");
+      row.className = "row";
+      row.setAttribute("role", "row");
+      for (let c = 0; c < COLS; c++) {
+        const i = r * COLS + c;
+        const cell = S.cells[i];
+        if (!cell) {
+          const g = document.createElement("span");
+          g.className = "cell ghost";
+          g.setAttribute("aria-hidden", "true");
+          row.appendChild(g);
+          continue;
+        }
+        const b = document.createElement("button");
+        b.type = "button";
+        b.dataset.i = i;
+        b.setAttribute("role", "gridcell");
+        let cls = "cell";
+        if (cell.c) cls += " done";
+        if (sel === i) cls += " sel";
+        if (fx.hint.has(i)) cls += " hint";
+        if (fx.bad.has(i)) cls += " bad";
+        if (fx.pop.has(i)) cls += " pop";
+        if (fx.fresh.has(i)) cls += " fresh";
+        b.className = cls;
+        b.setAttribute("aria-label", cell.c ? `${cell.v}, ratllat` : `${cell.v}, fila ${r + 1}, columna ${c + 1}`);
+        if (cell.c) b.tabIndex = -1;
+        if (sel === i) b.setAttribute("aria-pressed", "true");
+        const s = document.createElement("span");
+        s.textContent = cell.v;
+        b.appendChild(s);
+        row.appendChild(b);
+      }
+      frag.appendChild(row);
+    }
+    boardEl.replaceChildren(frag);
+
+    $("stage").textContent = S.stage;
+    $("score").textContent = S.score;
+    $("best").textContent = S.best;
+    $("addCount").textContent = S.adds;
+    $("hintCount").textContent = S.hints;
+    addBtn.disabled = S.adds <= 0 || S.over || S.won;
+    hintBtn.disabled = S.hints <= 0 || S.over || S.won;
+  }
+
+  function showOverlay() {
+    if (demo) return;
+    const won = S.won;
+    $("ovTitle").textContent = won ? `Fase ${S.stage} superada` : "Sense moviments";
+    $("ovText").textContent = won
+      ? "Has buidat tot el tauler. +150 punts. A la fase següent hi haurà més números."
+      : "No queden parelles ni usos d'Afegeix. Torna-hi i intenta superar el rècord.";
+    $("ovStage").textContent = S.stage;
+    $("ovScore").textContent = S.score;
+    $("ovBest").textContent = S.best;
+    $("ovBtn").textContent = won ? `Comença la fase ${S.stage + 1}` : "Partida nova";
+    $("overlay").hidden = false;
+    setTimeout(() => $("ovBtn").focus(), 50);
+  }
+
+  function hideOverlay() { $("overlay").hidden = true; }
+
+  // ---------- Desar ----------
+  function ser() {
+    return {
+      v: 1,
+      cells: S.cells.map((c) => (c.c ? -c.v : c.v)),
+      stage: S.stage, score: S.score, best: S.best,
+      adds: S.adds, hints: S.hints, over: S.over, won: S.won
+    };
+  }
+
+  function deser(d) {
+    if (!d || d.v !== 1 || !Array.isArray(d.cells)) return null;
+    if (!d.cells.every((x) => Number.isInteger(x) && Math.abs(x) >= 1 && Math.abs(x) <= 9)) return null;
+    return {
+      cells: d.cells.map((x) => ({ v: Math.abs(x), c: x < 0 })),
+      stage: Math.max(1, d.stage | 0),
+      score: Math.max(0, d.score | 0),
+      best: Math.max(0, d.best | 0, d.score | 0),
+      adds: Math.max(0, Math.min(ADDS, d.adds | 0)),
+      hints: Math.max(0, Math.min(HINTS, d.hints | 0)),
+      over: !!d.over, won: !!d.won
+    };
+  }
+
+  function save() {
+    if (demo) return;
+    try { localStorage.setItem(KEY, JSON.stringify(ser())); } catch (e) { /* sense emmagatzematge */ }
+  }
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { return null; }
+  }
+
+  // ---------- Demo ----------
+  let demo = null; // { tok, saved }
+  const fingerEl = $("finger");
+  const DEMO_CELLS = [
+    7, 7, 2, 8, 6, 3, 5, 2, 1,
+    9, 8, 3, 1, 4, 5, 7, 6, 2,
+    4, 9, 1, 6, 3, 8, 2, 5, 7
+  ];
+  const DEMO_STEPS = [
+    { t: "Dos números iguals i veïns fan parella: el 7 i el 7.", pair: [0, 1] },
+    { t: "També fan parella dos números que sumen 10: 2 + 8.", pair: [2, 3] },
+    { t: "Si no són iguals ni sumen 10, no es poden unir: 6 + 3 només fa 9.", pair: [4, 5], bad: true },
+    { t: "En vertical també es pot: 6 + 4.", pair: [4, 13] },
+    { t: "I en diagonal: 3 + 7.", pair: [5, 15] },
+    { t: "El final d'una fila connecta amb l'inici de la següent: 1 + 9.", pair: [8, 9] },
+    { t: "Les caselles ratllades no fan nosa: el 2 salta per sobre fins al 8. Una parella a distància val 4 punts.", pair: [7, 10] },
+    { t: "Diagonal cap a l'esquerra: 5 + 5. La primera fila queda buida i desapareix (+10).", pair: [6, 14] },
+    { t: "Quan no trobis cap parella, Afegeix copia al final tots els números que queden.", add: true },
+    { t: "Ja ho saps tot! Buida el tauler sencer per passar de fase. Ara et toca a tu.", end: true }
+  ];
+
+  function sleep(ms, tok) {
+    return new Promise((res, rej) => setTimeout(() => (demo && demo.tok === tok ? res() : rej(new Error("stop"))), ms));
+  }
+
+  function caption(k, text) {
+    $("demoStep").textContent = `Demo · pas ${k + 1} de ${DEMO_STEPS.length}`;
+    $("demoText").textContent = text;
+  }
+
+  function hideFinger() { fingerEl.hidden = true; }
+
+  async function pointAt(i, tok) {
+    const el = boardEl.querySelector(`[data-i="${i}"]`);
+    if (!el) return;
+    const wr = wrapEl.getBoundingClientRect(), cr = el.getBoundingClientRect();
+    const x = cr.left - wr.left + cr.width / 2, y = cr.top - wr.top + cr.height / 2;
+    if (fingerEl.hidden) {
+      fingerEl.style.transition = "none";
+      fingerEl.style.left = x + "px"; fingerEl.style.top = y + "px";
+      fingerEl.hidden = false;
+      void fingerEl.offsetWidth;
+      fingerEl.style.transition = "";
+    } else {
+      fingerEl.style.left = x + "px"; fingerEl.style.top = y + "px";
+    }
+    await sleep(520, tok);
+    fingerEl.classList.remove("tap");
+    void fingerEl.offsetWidth;
+    fingerEl.classList.add("tap");
+  }
+
+  async function runDemo() {
+    if (demo || busy) return;
+    const tok = Date.now();
+    demo = { tok, saved: ser() };
+    S = {
+      cells: DEMO_CELLS.map((v) => ({ v, c: false })),
+      stage: 1, score: 0, best: 0, adds: ADDS, hints: HINTS, over: false, won: false
+    };
+    sel = null;
+    fx.hint.clear();
+    hideOverlay();
+    document.body.classList.add("demo");
+    $("demoBar").hidden = false;
+    $("demoExit").textContent = "Surt de la demo";
+    $("demoExit").classList.remove("go");
+    render();
+    $("demoBar").scrollIntoView({ behavior: "smooth", block: "start" });
+    try {
+      for (let k = 0; k < DEMO_STEPS.length; k++) {
+        const st = DEMO_STEPS[k];
+        caption(k, st.t);
+        await sleep(1300, tok);
+        if (st.pair) {
+          await pointAt(st.pair[0], tok);
+          tap(st.pair[0]);
+          await sleep(500, tok);
+          await pointAt(st.pair[1], tok);
+          tap(st.pair[1]);
+          await sleep(1700, tok);
+          if (st.bad) { sel = null; render(); }
+          while (busy) await sleep(100, tok);
+          await sleep(300, tok);
+        } else if (st.add) {
+          hideFinger();
+          nudge(addBtn);
+          await sleep(1300, tok);
+          addNumbers();
+          await sleep(2600, tok);
+        } else if (st.end) {
+          hideFinger();
+          $("demoExit").textContent = "Comença a jugar";
+          $("demoExit").classList.add("go");
+          $("demoExit").focus();
+        }
+      }
+    } catch (e) { /* demo aturada */ }
+  }
+
+  function stopDemo() {
+    if (!demo) return;
+    const saved = demo.saved;
+    demo = null;
+    busy = false;
+    hideFinger();
+    S = deser(saved) || freshState(1, 0, 0);
+    sel = null;
+    fx = { pop: new Set(), bad: new Set(), hint: new Set(), fresh: new Set() };
+    $("demoBar").hidden = true;
+    document.body.classList.remove("demo");
+    say("Ja pots jugar. Toca un número i després la seva parella.");
+    render();
+    if (S.over || S.won) showOverlay();
+  }
+
+  // ---------- Esdeveniments ----------
+  boardEl.addEventListener("click", (e) => {
+    if (demo) return;
+    const b = e.target.closest("button.cell");
+    if (b) tap(+b.dataset.i);
+  });
+  addBtn.addEventListener("click", () => { if (!demo) addNumbers(); });
+  hintBtn.addEventListener("click", () => { if (!demo) hint(); });
+  $("demoBtn").addEventListener("click", runDemo);
+  $("demoExit").addEventListener("click", stopDemo);
+  newBtn.addEventListener("click", () => {
+    if (demo) return;
+    const inProgress = !S.over && !S.won && (S.score > 0 || S.cells.some((c) => c.c));
+    if (inProgress && !confirmTimer) {
+      $("newLbl").textContent = "Segur?";
+      say("Toca Segur? per començar una partida nova. Perdràs la partida actual.", "warn");
+      confirmTimer = setTimeout(() => { $("newLbl").textContent = "Nova"; confirmTimer = null; }, 3000);
+      return;
+    }
+    clearTimeout(confirmTimer); confirmTimer = null;
+    $("newLbl").textContent = "Nova";
+    newGame();
+  });
+  $("ovBtn").addEventListener("click", () => (S.won ? nextStage() : newGame()));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && demo) { stopDemo(); return; }
+    if (e.key === "Escape" && sel !== null) { sel = null; render(); }
+  });
+
+  // ---------- Inici ----------
+  function start(data) {
+    const saved = deser((data && data.state) || load());
+    S = saved || freshState(1, 0, 0);
+    if (!saved) {
+      try { const d = document.getElementById("rules"); if (d) d.open = true; } catch (e) {}
+    }
+    render();
+    if (S.over || S.won) showOverlay();
+    try {
+      if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
+        window.claude.hot.snapshot(() => ({ state: demo ? demo.saved : ser() }));
+      }
+    } catch (e) { /* opcional */ }
+  }
+
+  const hot = window.claude && window.claude.hot;
+  if (hot && hot.ready) hot.ready(start);
+  else start((hot && hot.data) || {});
+})();
+</script>
+</body>
+</html>
