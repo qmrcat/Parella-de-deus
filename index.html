@@ -304,7 +304,26 @@
   details.rules summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
   .rules ul { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; line-height: 1.5; max-width: 65ch; color: var(--ink-soft); }
   .rules b { color: var(--ink); font-weight: 600; }
-  .pairs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .pair-group { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+  .pair-lbl { font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-soft); }
+  .pairs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pair.extra { border-color: var(--mark); background: color-mix(in srgb, var(--mark) 22%, var(--btn)); }
+  .stats.four { grid-template-columns: repeat(4, auto); justify-content: space-between; column-gap: 12px; }
+  .stat .lbl { white-space: nowrap; }
+  .top { flex-wrap: nowrap; align-items: flex-start; }
+  .top > div { flex: 1; min-width: 0; }
+  #demoBtn { flex: none; }
+  .chip {
+    display: inline-block; min-width: 1.6em; text-align: center;
+    background: var(--mark); color: var(--mark-ink);
+    padding: 0 .22em; border-radius: 6px 9px 7px 10px;
+  }
+  .stat.target.nudge .chip { animation: nudge .55s ease-in-out 3; }
+  .tnum {
+    color: var(--ink); font-weight: 700;
+    background: color-mix(in srgb, var(--mark) 45%, transparent);
+    padding: 0 .2em; border-radius: 4px;
+  }
   .pair {
     display: inline-flex; align-items: center; gap: 4px;
     padding: 4px 10px; border-radius: 999px;
@@ -365,7 +384,7 @@
   <header class="top">
     <div>
       <h1>Parelles de <span class="ten">Deu</span></h1>
-      <p class="tagline">Uneix números iguals o que sumin 10.</p>
+      <p class="tagline">Uneix números iguals, que sumin 10 o que sumin <b class="tnum" id="tagTarget">13</b>.</p>
     </div>
     <button class="btn small" id="demoBtn" type="button">
       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
@@ -373,8 +392,9 @@
     </button>
   </header>
 
-  <section class="stats" aria-label="Marcador">
+  <section class="stats four" aria-label="Marcador">
     <div class="stat"><span class="lbl">Fase</span><span class="val" id="stage">1</span></div>
+    <div class="stat target" id="targetStat"><span class="lbl">Suma extra</span><span class="val"><span class="chip" id="target">13</span></span></div>
     <div class="stat"><span class="lbl">Punts</span><span class="val" id="score">0</span></div>
     <div class="stat best"><span class="lbl">Rècord</span><span class="val" id="best">0</span></div>
   </section>
@@ -413,18 +433,26 @@
     <summary>Com es juga</summary>
     <ul>
       <li>Tria dos números <b>iguals</b> (7 i 7) o que <b>sumin 10</b> (3 i 7).</li>
+      <li>Cada fase té també una <b>suma extra</b> triada a l'atzar (del 2 al 9 o de l'11 al 18). Es veu al marcador. Dos números que sumin aquest valor també fan parella, amb les mateixes regles que el 10.</li>
       <li>Han d'estar <b>connectats</b>: al costat en horitzontal, vertical o diagonal, o bé el final d'una fila amb l'inici de la següent. Les caselles ja ratllades no compten com a obstacle.</li>
       <li>Quan una fila queda buida, desapareix i les de sota pugen.</li>
       <li>Si no trobes cap parella, <b>Afegeix</b> copia tots els números que queden al final del tauler. Tens 5 usos per fase.</li>
       <li>Buida tot el tauler per passar de fase. Si no queden parelles ni usos d'Afegeix, la partida s'acaba.</li>
       <li><b>Punts:</b> 1 per parella veïna, 4 per parella separada per caselles ratllades, 10 per fila buidada i 150 per tauler net.</li>
     </ul>
-    <div class="pairs" aria-label="Parelles que sumen deu">
-      <span class="pair">1<i>+</i>9</span>
-      <span class="pair">2<i>+</i>8</span>
-      <span class="pair">3<i>+</i>7</span>
-      <span class="pair">4<i>+</i>6</span>
-      <span class="pair">5<i>+</i>5</span>
+    <div class="pair-group">
+      <span class="pair-lbl">Sumen 10</span>
+      <div class="pairs" aria-label="Parelles que sumen 10">
+        <span class="pair">1<i>+</i>9</span>
+        <span class="pair">2<i>+</i>8</span>
+        <span class="pair">3<i>+</i>7</span>
+        <span class="pair">4<i>+</i>6</span>
+        <span class="pair">5<i>+</i>5</span>
+      </div>
+    </div>
+    <div class="pair-group">
+      <span class="pair-lbl">Sumen <span id="rulesTarget">13</span> (suma extra d'aquesta fase)</span>
+      <div class="pairs" id="targetPairs" aria-label="Parelles de la suma extra"></div>
     </div>
   </details>
 </main>
@@ -469,7 +497,17 @@
   let confirmTimer = null;
 
   // ---------- Lògica ----------
-  const fits = (a, b) => a === b || a + b === 10;
+  // Suma extra de cada fase: del 2 al 9 o de l'11 al 18
+  const TARGETS = [2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18];
+  const randomTarget = () => TARGETS[Math.floor(Math.random() * TARGETS.length)];
+  const validTarget = (t) => TARGETS.includes(t);
+  const fits = (a, b, t) => a === b || a + b === 10 || a + b === t;
+  // Parelles de xifres (1-9) que sumen t
+  function pairsFor(t) {
+    const out = [];
+    for (let a = 1; a <= 9; a++) { const b = t - a; if (b >= a && b <= 9) out.push([a, b]); }
+    return out;
+  }
 
   function firstOpen(cells, i, d) {
     const c0 = i % COLS;
@@ -493,24 +531,24 @@
     return null;
   }
 
-  function allMoves(cells) {
+  function allMoves(cells, t) {
     const out = [];
     cells.forEach((cell, i) => {
       if (cell.c) return;
       for (const d of DIRS) {
         const r = firstOpen(cells, i, d);
-        if (r && fits(cell.v, cells[r.k].v)) out.push([i, r.k, r.m]);
+        if (r && fits(cell.v, cells[r.k].v, t)) out.push([i, r.k, r.m]);
       }
     });
     return out;
   }
 
-  function makeBoard(count) {
+  function makeBoard(count, t) {
     let cells;
     for (let tries = 0; tries < 400; tries++) {
       cells = Array.from({ length: count }, () => ({ v: 1 + Math.floor(Math.random() * 9), c: false }));
-      const n = allMoves(cells).length;
-      if (n >= 3 && n <= 10) break;
+      const n = allMoves(cells, t).length;
+      if (n >= 3 && n <= 12) break;
     }
     return cells;
   }
@@ -519,9 +557,12 @@
     return Math.min(27 + 9 * (stage - 1), 45);
   }
 
-  function freshState(stage, score, best) {
+  function freshState(stage, score, best, prevTarget) {
+    let target = randomTarget();
+    while (target === prevTarget) target = randomTarget();
     return {
-      cells: makeBoard(stageSize(stage)),
+      cells: makeBoard(stageSize(stage), target),
+      target,
       stage, score, best,
       adds: ADDS, hints: HINTS,
       over: false, won: false
@@ -555,21 +596,23 @@
 
     const a = S.cells[sel];
     const r = link(S.cells, sel, i);
-    if (r && fits(a.v, cell.v)) {
+    const T = S.target;
+    if (r && fits(a.v, cell.v, T)) {
       a.c = true; cell.c = true;
       const pts = r.m > 1 ? 4 : 1;
       addPoints(pts);
       fx.pop = new Set([sel, i]);
       const pair = [sel, i];
       sel = null;
-      say(pts > 1 ? "Parella a distància. +4" : "Parella! +1", "good");
+      const why = a.v === cell.v ? "Iguals" : a.v + cell.v === 10 ? "Suma 10" : `Suma ${T}`;
+      say(`${why}: ${a.v} i ${cell.v}.` + (pts > 1 ? " Parella a distància, +4." : " +1."), "good");
       render();
       floatAt(pair[1], "+" + pts);
       fx.pop.clear();
       save();
       afterMatch();
     } else {
-      if (!fits(a.v, cell.v)) say(`${a.v} i ${cell.v} no són iguals ni sumen 10.`, "warn");
+      if (!fits(a.v, cell.v, T)) say(`${a.v} + ${cell.v} fan ${a.v + cell.v}: no són iguals ni sumen 10 ni ${T}.`, "warn");
       else say("Aquests dos no estan connectats: hi ha números pel mig.", "warn");
       fx.bad = new Set([sel, i]);
       sel = i;
@@ -616,7 +659,7 @@
       showOverlay();
       return;
     }
-    if (allMoves(S.cells).length === 0) {
+    if (allMoves(S.cells, S.target).length === 0) {
       if (S.adds > 0) {
         say("No queden parelles. Toca Afegeix per continuar.", "warn");
         nudge(addBtn);
@@ -645,13 +688,13 @@
     const target = boardEl.children[Math.floor(start / COLS)];
     if (target) target.scrollIntoView({ behavior: "smooth", block: "nearest" });
     save();
-    if (allMoves(S.cells).length === 0) check();
+    if (allMoves(S.cells, S.target).length === 0) check();
   }
 
   function hint() {
     if (busy || S.over || S.won) return;
     if (S.hints <= 0) { say("No et queden pistes en aquesta fase.", "warn"); return; }
-    const ms = allMoves(S.cells);
+    const ms = allMoves(S.cells, S.target);
     if (!ms.length) {
       say("No hi ha cap parella. Toca Afegeix.", "warn");
       nudge(addBtn);
@@ -674,18 +717,20 @@
     sel = null;
     fx.hint.clear();
     hideOverlay();
-    say("Partida nova. Toca un número i després la seva parella.");
+    say(`Partida nova. La suma extra d'aquesta fase és ${S.target}.`);
+    nudge($("targetStat"));
     render();
     save();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function nextStage() {
-    S = freshState(S.stage + 1, S.score, S.best);
+    S = freshState(S.stage + 1, S.score, S.best, S.target);
     sel = null;
     fx.hint.clear();
     hideOverlay();
-    say(`Fase ${S.stage}. Tens ${ADDS} Afegeix i ${HINTS} pistes.`);
+    say(`Fase ${S.stage}. Nova suma extra: ${S.target}. Tens ${ADDS} Afegeix i ${HINTS} pistes.`);
+    nudge($("targetStat"));
     render();
     save();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -760,6 +805,19 @@
     boardEl.replaceChildren(frag);
 
     $("stage").textContent = S.stage;
+    $("target").textContent = S.target;
+    $("tagTarget").textContent = S.target;
+    $("rulesTarget").textContent = S.target;
+    const tp = $("targetPairs");
+    if (tp.dataset.t !== String(S.target)) {
+      tp.dataset.t = S.target;
+      tp.replaceChildren(...pairsFor(S.target).map(([a, b]) => {
+        const s = document.createElement("span");
+        s.className = "pair extra";
+        s.innerHTML = `${a}<i>+</i>${b}`;
+        return s;
+      }));
+    }
     $("score").textContent = S.score;
     $("best").textContent = S.best;
     $("addCount").textContent = S.adds;
@@ -773,7 +831,7 @@
     const won = S.won;
     $("ovTitle").textContent = won ? `Fase ${S.stage} superada` : "Sense moviments";
     $("ovText").textContent = won
-      ? "Has buidat tot el tauler. +150 punts. A la fase següent hi haurà més números."
+      ? "Has buidat tot el tauler. +150 punts. A la fase següent hi haurà més números i una suma extra nova."
       : "No queden parelles ni usos d'Afegeix. Torna-hi i intenta superar el rècord.";
     $("ovStage").textContent = S.stage;
     $("ovScore").textContent = S.score;
@@ -790,6 +848,7 @@
     return {
       v: 1,
       cells: S.cells.map((c) => (c.c ? -c.v : c.v)),
+      target: S.target,
       stage: S.stage, score: S.score, best: S.best,
       adds: S.adds, hints: S.hints, over: S.over, won: S.won
     };
@@ -800,6 +859,7 @@
     if (!d.cells.every((x) => Number.isInteger(x) && Math.abs(x) >= 1 && Math.abs(x) <= 9)) return null;
     return {
       cells: d.cells.map((x) => ({ v: Math.abs(x), c: x < 0 })),
+      target: validTarget(d.target) ? d.target : randomTarget(),
       stage: Math.max(1, d.stage | 0),
       score: Math.max(0, d.score | 0),
       best: Math.max(0, d.best | 0, d.score | 0),
@@ -826,15 +886,18 @@
     9, 8, 3, 1, 4, 5, 7, 6, 2,
     4, 9, 1, 6, 3, 8, 2, 5, 7
   ];
+  const DEMO_TARGET = 13;
   const DEMO_STEPS = [
+    { t: "Cada fase té una suma extra triada a l'atzar, que es veu al marcador. En aquesta demo és el 13.", info: true },
     { t: "Dos números iguals i veïns fan parella: el 7 i el 7.", pair: [0, 1] },
     { t: "També fan parella dos números que sumen 10: 2 + 8.", pair: [2, 3] },
-    { t: "Si no són iguals ni sumen 10, no es poden unir: 6 + 3 només fa 9.", pair: [4, 5], bad: true },
+    { t: "Si no són iguals ni sumen 10 ni 13, no es poden unir: 6 + 3 només fa 9.", pair: [4, 5], bad: true },
     { t: "En vertical també es pot: 6 + 4.", pair: [4, 13] },
     { t: "I en diagonal: 3 + 7.", pair: [5, 15] },
     { t: "El final d'una fila connecta amb l'inici de la següent: 1 + 9.", pair: [8, 9] },
     { t: "Les caselles ratllades no fan nosa: el 2 salta per sobre fins al 8. Una parella a distància val 4 punts.", pair: [7, 10] },
     { t: "Diagonal cap a l'esquerra: 5 + 5. La primera fila queda buida i desapareix (+10).", pair: [6, 14] },
+    { t: "Ara la suma extra: 4 + 9 = 13. Funciona igual que el 10: en horitzontal, vertical, diagonal o saltant caselles ratllades.", pair: [9, 10] },
     { t: "Quan no trobis cap parella, Afegeix copia al final tots els números que queden.", add: true },
     { t: "Ja ho saps tot! Buida el tauler sencer per passar de fase. Ara et toca a tu.", end: true }
   ];
@@ -876,6 +939,7 @@
     demo = { tok, saved: ser() };
     S = {
       cells: DEMO_CELLS.map((v) => ({ v, c: false })),
+      target: DEMO_TARGET,
       stage: 1, score: 0, best: 0, adds: ADDS, hints: HINTS, over: false, won: false
     };
     sel = null;
@@ -886,7 +950,7 @@
     $("demoExit").textContent = "Surt de la demo";
     $("demoExit").classList.remove("go");
     render();
-    $("demoBar").scrollIntoView({ behavior: "smooth", block: "start" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
     try {
       for (let k = 0; k < DEMO_STEPS.length; k++) {
         const st = DEMO_STEPS[k];
@@ -902,6 +966,10 @@
           if (st.bad) { sel = null; render(); }
           while (busy) await sleep(100, tok);
           await sleep(300, tok);
+        } else if (st.info) {
+          hideFinger();
+          nudge($("targetStat"));
+          await sleep(2800, tok);
         } else if (st.add) {
           hideFinger();
           nudge(addBtn);
