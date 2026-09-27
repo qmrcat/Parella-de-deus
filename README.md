@@ -1,6 +1,6 @@
 # Parelles de Deu
 
-Joc de números per al navegador, inspirat en *Number Match* d'Easybrain. L'objectiu és buidar el tauler unint parelles de números iguals, que sumin 10 o que sumin la **suma extra** de cada fase.
+Joc de números per al navegador. L'objectiu és buidar el tauler unint parelles de números iguals, que sumin 10 o que sumin la **suma extra** de cada fase.
 
 Tot el joc és un únic fitxer HTML amb JavaScript i CSS escrits a mà. No fa servir cap framework ni cap llibreria, i no cal compilar ni instal·lar res.
 
