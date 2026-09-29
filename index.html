@@ -372,9 +372,29 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
   }
-  @media (max-width: 380px) {
-    .btn { font-size: 14px; gap: 5px; }
-    .btn svg { display: none; }
+  /* Barra d'accions de 4 botons: icona a sobre, text a sota */
+  .actions { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .actions .btn {
+    position: relative;
+    flex-direction: column; gap: 4px;
+    min-height: 62px; padding-inline: 4px;
+    font-size: 12.5px;
+  }
+  .actions .btn svg { width: 19px; height: 19px; }
+  .actions .badge {
+    position: absolute; top: 3px; right: 3px;
+    min-width: 18px; height: 18px; padding-inline: 4px;
+    border-radius: 10px; font-size: 11px;
+  }
+  .btn.toggle.on {
+    background: var(--mark); color: var(--mark-ink); border-color: var(--mark);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--mark-ink) 25%, transparent);
+  }
+  .board-wrap.mult { box-shadow: 0 0 0 3px var(--mark), var(--shadow); }
+  .cell.fused > span { animation: pop .5s ease-out; color: var(--hint); }
+  body.demo #multBtn, body.demo #addBtn { pointer-events: none; }
+  @media (max-width: 360px) {
+    .actions .btn { font-size: 12px; }
   }
 </style>
 </head>
@@ -415,6 +435,10 @@
   </div>
 
   <nav class="actions" aria-label="Accions">
+    <button class="btn toggle" id="multBtn" type="button" aria-pressed="false" title="Multiplica (tecla X)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg>
+      Multiplica
+    </button>
     <button class="btn primary" id="addBtn" type="button">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
       Afegeix <span class="badge" id="addCount">5</span>
@@ -433,7 +457,14 @@
     <summary>Com es juga</summary>
     <ul>
       <li>Tria dos números <b>iguals</b> (7 i 7) o que <b>sumin 10</b> (3 i 7).</li>
-      <li>Cada fase té també una <b>suma extra</b> triada a l'atzar (del 2 al 9 o de l'11 al 18). Es veu al marcador. Dos números que sumin aquest valor també fan parella, amb les mateixes regles que el 10.</li>
+      <li>Cada fase té també una <b>suma extra</b> triada a l'atzar: del 6 al 9 o de l'11 al 18, i és més freqüent que sigui de dues xifres. Es veu al marcador. Dos números que sumin aquest valor també fan parella, amb les mateixes regles que el 10.</li>
+      <li><b>Multiplica (×):</b> activa'l abans de triar la parella i tria dos números connectats.
+        <ul>
+          <li>Si el producte fa <b>10</b> o la <b>suma extra</b>, la parella desapareix (5 × 2 = 10).</li>
+          <li>Si el producte és de <b>9 o menys</b>, el primer número desapareix i l'últim que has tocat es converteix en el resultat (3 × 2 = 6).</li>
+          <li>Si el producte és <b>més gran que 9</b> (i no és 10 ni la suma extra), o els números no estan connectats, és un error.</li>
+        </ul>
+        El botó es desactiva sol després de cada parella, tant si és correcta com si no.</li>
       <li>Han d'estar <b>connectats</b>: al costat en horitzontal, vertical o diagonal, o bé el final d'una fila amb l'inici de la següent. Les caselles ja ratllades no compten com a obstacle.</li>
       <li>Quan una fila queda buida, desapareix i les de sota pugen.</li>
       <li>Si no trobes cap parella, <b>Afegeix</b> copia tots els números que queden al final del tauler. Tens 5 usos per fase.</li>
@@ -493,14 +524,17 @@
   let S = null;          // estat de la partida
   let sel = null;        // índex seleccionat
   let busy = false;      // bloqueig durant animacions
-  let fx = { pop: new Set(), bad: new Set(), hint: new Set(), fresh: new Set() };
+  let fx = { pop: new Set(), bad: new Set(), hint: new Set(), fresh: new Set(), fused: new Set() };
   let confirmTimer = null;
 
   // ---------- Lògica ----------
-  // Suma extra de cada fase: del 2 al 9 o de l'11 al 18
-  const TARGETS = [2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18];
-  const randomTarget = () => TARGETS[Math.floor(Math.random() * TARGETS.length)];
-  const validTarget = (t) => TARGETS.includes(t);
+  // Suma extra de cada fase: del 6 al 9 (30 %) o de l'11 al 18 (70 %)
+  const TARGETS_ONE = [6, 7, 8, 9];
+  const TARGETS_TWO = [11, 12, 13, 14, 15, 16, 17, 18];
+  const TWO_DIGIT_CHANCE = 0.7;
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const randomTarget = () => pick(Math.random() < TWO_DIGIT_CHANCE ? TARGETS_TWO : TARGETS_ONE);
+  const validTarget = (t) => TARGETS_ONE.includes(t) || TARGETS_TWO.includes(t);
   const fits = (a, b, t) => a === b || a + b === 10 || a + b === t;
   // Parelles de xifres (1-9) que sumen t
   function pairsFor(t) {
@@ -584,6 +618,97 @@
     if (S.score > S.best) S.best = S.score;
   }
 
+  // ---------- Multiplicació ----------
+  let mult = false;
+  const multBtn = $("multBtn");
+
+  // remove: el producte és 10 o la suma extra; fuse: producte ≤ 9; error: la resta
+  function multOutcome(a, b, t) {
+    const p = a * b;
+    if (p === 10 || p === t) return { kind: "remove", p };
+    if (p <= 9) return { kind: "fuse", p };
+    return { kind: "error", p };
+  }
+
+  function multMoves(cells, t) {
+    const out = [];
+    cells.forEach((cell, i) => {
+      if (cell.c) return;
+      for (const d of DIRS) {
+        const r = firstOpen(cells, i, d);
+        if (r && multOutcome(cell.v, cells[r.k].v, t).kind !== "error") out.push([i, r.k, r.m]);
+      }
+    });
+    return out;
+  }
+
+  function setMult(on) {
+    mult = on;
+    if (on) { sel = null; fx.hint.clear(); }
+    multBtn.classList.toggle("on", on);
+    multBtn.setAttribute("aria-pressed", on ? "true" : "false");
+    wrapEl.classList.toggle("mult", on);
+  }
+
+  function toggleMult() {
+    if (busy || S.over || S.won) return;
+    setMult(!mult);
+    render();
+    if (mult) say("Multiplicació activada: tria dos números connectats.");
+    else say("Multiplicació desactivada.");
+  }
+
+  function multTap(i) {
+    const first = sel;
+    const a = S.cells[first], b = S.cells[i];
+    const r = link(S.cells, first, i);
+    const T = S.target;
+    setMult(false);
+    if (!r) {
+      say("Error: aquests dos números no estan connectats.", "warn");
+      fx.bad = new Set([first, i]);
+      sel = null;
+      render();
+      fx.bad.clear();
+      return;
+    }
+    const va = a.v, vb = b.v;
+    const o = multOutcome(va, vb, T);
+    const expr = `${va} × ${vb} = ${o.p}`;
+    if (o.kind === "error") {
+      say(`Error: ${expr}. És més gran que 9 i no és 10 ni ${T}.`, "warn");
+      fx.bad = new Set([first, i]);
+      sel = null;
+      render();
+      fx.bad.clear();
+      return;
+    }
+    let pts, label;
+    if (o.kind === "remove") {
+      a.c = true; b.c = true;
+      pts = r.m > 1 ? 4 : 1;
+      fx.pop = new Set([first, i]);
+      say(`${expr}. ${o.p === 10 ? "Fa 10" : "És la suma extra"}: parella eliminada. +${pts}`, "good");
+      label = "+" + pts;
+    } else {
+      a.c = true;
+      b.v = o.p;
+      pts = 1;
+      fx.pop = new Set([first]);
+      fx.fused = new Set([i]);
+      say(`${expr}: el ${va} desapareix i el ${vb} passa a ser ${o.p}. +1`, "good");
+      label = `×=${o.p}`;
+    }
+    addPoints(pts);
+    sel = null;
+    render();
+    floatAt(i, label);
+    fx.pop.clear();
+    fx.fused.clear();
+    save();
+    afterMatch();
+  }
+
   // ---------- Accions ----------
   function tap(i) {
     if (busy || S.over || S.won) return;
@@ -593,6 +718,7 @@
 
     if (sel === null) { sel = i; render(); return; }
     if (sel === i) { sel = null; render(); return; }
+    if (mult) { multTap(i); return; }
 
     const a = S.cells[sel];
     const r = link(S.cells, sel, i);
@@ -660,7 +786,13 @@
       return;
     }
     if (allMoves(S.cells, S.target).length === 0) {
-      if (S.adds > 0) {
+      const canMult = multMoves(S.cells, S.target).length > 0;
+      if (canMult) {
+        say(S.adds > 0
+          ? "No queden parelles directes. Prova de multiplicar (×) o toca Afegeix."
+          : "No queden parelles directes. Encara pots multiplicar (×).", "warn");
+        nudge(multBtn);
+      } else if (S.adds > 0) {
         say("No queden parelles. Toca Afegeix per continuar.", "warn");
         nudge(addBtn);
       } else {
@@ -694,7 +826,12 @@
   function hint() {
     if (busy || S.over || S.won) return;
     if (S.hints <= 0) { say("No et queden pistes en aquesta fase.", "warn"); return; }
-    const ms = allMoves(S.cells, S.target);
+    let ms = allMoves(S.cells, S.target);
+    let viaMult = false;
+    if (!ms.length) {
+      ms = multMoves(S.cells, S.target);
+      viaMult = true;
+    }
     if (!ms.length) {
       say("No hi ha cap parella. Toca Afegeix.", "warn");
       nudge(addBtn);
@@ -702,9 +839,15 @@
     }
     const [a, b] = ms[Math.floor(Math.random() * ms.length)];
     S.hints--;
+    if (mult) setMult(false);
     sel = null;
     fx.hint = new Set([a, b]);
-    say("Mira les dues caselles marcades.");
+    if (viaMult) {
+      say("Activa × i multiplica les dues caselles marcades.");
+      nudge(multBtn);
+    } else {
+      say("Mira les dues caselles marcades.");
+    }
     render();
     const el = boardEl.querySelector(`[data-i="${a}"]`);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -714,6 +857,7 @@
   function newGame() {
     const best = S ? S.best : 0;
     S = freshState(1, 0, best);
+    setMult(false);
     sel = null;
     fx.hint.clear();
     hideOverlay();
@@ -726,6 +870,7 @@
 
   function nextStage() {
     S = freshState(S.stage + 1, S.score, S.best, S.target);
+    setMult(false);
     sel = null;
     fx.hint.clear();
     hideOverlay();
@@ -791,6 +936,7 @@
         if (fx.bad.has(i)) cls += " bad";
         if (fx.pop.has(i)) cls += " pop";
         if (fx.fresh.has(i)) cls += " fresh";
+        if (fx.fused.has(i)) cls += " fused";
         b.className = cls;
         b.setAttribute("aria-label", cell.c ? `${cell.v}, ratllat` : `${cell.v}, fila ${r + 1}, columna ${c + 1}`);
         if (cell.c) b.tabIndex = -1;
@@ -824,6 +970,7 @@
     $("hintCount").textContent = S.hints;
     addBtn.disabled = S.adds <= 0 || S.over || S.won;
     hintBtn.disabled = S.hints <= 0 || S.over || S.won;
+    multBtn.disabled = S.over || S.won;
   }
 
   function showOverlay() {
@@ -883,21 +1030,25 @@
   const fingerEl = $("finger");
   const DEMO_CELLS = [
     7, 7, 2, 8, 6, 3, 5, 2, 1,
-    9, 8, 3, 1, 4, 5, 7, 6, 2,
-    4, 9, 1, 6, 3, 8, 2, 5, 7
+    9, 8, 3, 2, 4, 5, 7, 5, 2,
+    4, 8, 7, 2, 9, 1, 6, 3, 8
   ];
-  const DEMO_TARGET = 13;
+  const DEMO_TARGET = 12;
   const DEMO_STEPS = [
-    { t: "Cada fase té una suma extra triada a l'atzar, que es veu al marcador. En aquesta demo és el 13.", info: true },
+    { t: "Cada fase té una suma extra triada a l'atzar, que es veu al marcador. En aquesta demo és el 12.", info: true },
     { t: "Dos números iguals i veïns fan parella: el 7 i el 7.", pair: [0, 1] },
     { t: "També fan parella dos números que sumen 10: 2 + 8.", pair: [2, 3] },
-    { t: "Si no són iguals ni sumen 10 ni 13, no es poden unir: 6 + 3 només fa 9.", pair: [4, 5], bad: true },
+    { t: "Si no són iguals ni sumen 10 ni 12, no es poden unir: 6 + 3 només fa 9.", pair: [4, 5], bad: true },
     { t: "En vertical també es pot: 6 + 4.", pair: [4, 13] },
     { t: "I en diagonal: 3 + 7.", pair: [5, 15] },
     { t: "El final d'una fila connecta amb l'inici de la següent: 1 + 9.", pair: [8, 9] },
     { t: "Les caselles ratllades no fan nosa: el 2 salta per sobre fins al 8. Una parella a distància val 4 punts.", pair: [7, 10] },
     { t: "Diagonal cap a l'esquerra: 5 + 5. La primera fila queda buida i desapareix (+10).", pair: [6, 14] },
-    { t: "Ara la suma extra: 4 + 9 = 13. Funciona igual que el 10: en horitzontal, vertical, diagonal o saltant caselles ratllades.", pair: [9, 10] },
+    { t: "Ara la suma extra: 4 + 8 = 12. Funciona igual que el 10: en horitzontal, vertical, diagonal o saltant caselles ratllades.", pair: [9, 10] },
+    { t: "Amb el botó × actiu, multipliques. 3 × 2 = 6: el 3 desapareix i el 2 es converteix en 6.", pair: [2, 3], mult: true },
+    { t: "Si el producte fa 10, la parella desapareix: 5 × 2 = 10.", pair: [7, 8], mult: true },
+    { t: "Si el producte és la suma extra, també desapareix: 6 × 2 = 12. La fila queda buida.", pair: [3, 12], mult: true },
+    { t: "Si el producte passa de 9 i no és 10 ni la suma extra, és un error: 7 × 9 = 63. El botó × es desactiva igualment.", pair: [2, 4], mult: true },
     { t: "Quan no trobis cap parella, Afegeix copia al final tots els números que queden.", add: true },
     { t: "Ja ho saps tot! Buida el tauler sencer per passar de fase. Ara et toca a tu.", end: true }
   ];
@@ -942,6 +1093,7 @@
       target: DEMO_TARGET,
       stage: 1, score: 0, best: 0, adds: ADDS, hints: HINTS, over: false, won: false
     };
+    setMult(false);
     sel = null;
     fx.hint.clear();
     hideOverlay();
@@ -957,6 +1109,14 @@
         caption(k, st.t);
         await sleep(1300, tok);
         if (st.pair) {
+          if (st.mult) {
+            hideFinger();
+            nudge(multBtn);
+            await sleep(700, tok);
+            setMult(true);
+            render();
+            await sleep(700, tok);
+          }
           await pointAt(st.pair[0], tok);
           tap(st.pair[0]);
           await sleep(500, tok);
@@ -994,7 +1154,8 @@
     hideFinger();
     S = deser(saved) || freshState(1, 0, 0);
     sel = null;
-    fx = { pop: new Set(), bad: new Set(), hint: new Set(), fresh: new Set() };
+    fx = { pop: new Set(), bad: new Set(), hint: new Set(), fresh: new Set(), fused: new Set() };
+    setMult(false);
     $("demoBar").hidden = true;
     document.body.classList.remove("demo");
     say("Ja pots jugar. Toca un número i després la seva parella.");
@@ -1010,6 +1171,7 @@
   });
   addBtn.addEventListener("click", () => { if (!demo) addNumbers(); });
   hintBtn.addEventListener("click", () => { if (!demo) hint(); });
+  multBtn.addEventListener("click", () => { if (!demo) toggleMult(); });
   $("demoBtn").addEventListener("click", runDemo);
   $("demoExit").addEventListener("click", stopDemo);
   newBtn.addEventListener("click", () => {
@@ -1028,7 +1190,9 @@
   $("ovBtn").addEventListener("click", () => (S.won ? nextStage() : newGame()));
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && demo) { stopDemo(); return; }
+    if (e.key === "Escape" && mult) { setMult(false); render(); say("Multiplicació desactivada."); return; }
     if (e.key === "Escape" && sel !== null) { sel = null; render(); }
+    if ((e.key === "x" || e.key === "X") && !demo && !e.ctrlKey && !e.metaKey && !e.altKey) toggleMult();
   });
 
   // ---------- Inici ----------
